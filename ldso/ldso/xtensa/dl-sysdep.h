@@ -106,7 +106,8 @@ extern unsigned long _dl_linux_resolver (struct elf_resolve *, int);
    the value.  */
 #define elf_machine_type_class(type) \
   (((type) == R_XTENSA_JMP_SLOT || (type) == R_XTENSA_TLS_TPOFF \
-   || (type) == R_XTENSA_TLSDESC_FN || (type) == R_XTENSA_TLSDESC_ARG) \
+   || (type) == R_XTENSA_TLSDESC_FN || (type) == R_XTENSA_TLSDESC_ARG \
+   || (type) == R_XTENSA_TLSDESC) \
    * ELF_RTYPE_CLASS_PLT)
 
 /* Return the link-time address of _DYNAMIC.  */
