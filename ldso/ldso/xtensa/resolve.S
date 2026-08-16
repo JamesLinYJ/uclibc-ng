@@ -49,6 +49,15 @@ _dl_linux_resolve:
 	addi	a10, a10, 3
 	jx	a10
 #elif defined(__XTENSA_CALL0_ABI__)
+#ifdef __FDPIC__
+	/* Xtensa's address-only R_XTENSA_PLT ABI cannot carry the callee GOT
+	   required by FDPIC and is rejected by the linker.  There is no lazy
+	   resolver ABI for this path; fail deterministically if a malformed
+	   object nevertheless reaches it. */
+.Lfdpic_no_lazy:
+	ill
+	j	.Lfdpic_no_lazy
+#else
 	/* Reserve stack space and save incoming arguments.  */
 	addi	a1, a1, -32
 	s32i	a0, a1, 0
@@ -79,6 +88,7 @@ _dl_linux_resolve:
 
 	/* Jump to the target function.  */
 	jx	a10
+#endif
 #else
 #error Unsupported Xtensa ABI
 #endif

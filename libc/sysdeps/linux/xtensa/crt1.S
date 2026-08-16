@@ -62,6 +62,14 @@
 	.text
 	.align	4
 	.literal_position
+.Lcrt_fdpic_rofixup_list_delta:
+	.word	__ROFIXUP_LIST__@pcrel
+.Lcrt_fdpic_rofixup_list_adjust:
+	.word	.Lcrt_fdpic_rofixup_list_delta - .Lcrt_fdpic_bootstrap_pc
+.Lcrt_fdpic_rofixup_end_delta:
+	.word	__ROFIXUP_END__@pcrel
+.Lcrt_fdpic_rofixup_end_adjust:
+	.word	.Lcrt_fdpic_rofixup_end_delta - .Lcrt_fdpic_bootstrap_pc
 	.global	_start
 	.type	_start, @function
 _start:
@@ -69,27 +77,42 @@ _start:
 
 	.begin	no-transform
 	call0	1f
-2:
+.Lcrt_fdpic_bootstrap_pc:
 	.end	no-transform
 	.align	4
 	.literal_position
 1:
-	movi	a15, 2b
-	sub	a15, a0, a15
+	mov	a15, a0
 
 	mov	a12, a4
 	mov	a13, a5
 	mov	a14, a6
-	mov	a2, a4
-	movi	a3, __ROFIXUP_LIST__
-	add	a3, a3, a15
-	movi	a4, __ROFIXUP_END__
-	add	a4, a4, a15
-	movi	a0, __self_reloc
-	add	a0, a0, a15
-	callx0	a0
-
+	/* The dynamic loader transfers control with the executable GOT in
+	   a11.  A static executable has no interpreter/finalizer in a13 and
+	   must bootstrap that GOT from its own loadmap and .rofixup table. */
+	bnez	a13, .Lcrt_fdpic_got_ready
+	mov	a2, a15
+	l32r	a3, .Lcrt_fdpic_rofixup_list_delta
+	l32r	a10, .Lcrt_fdpic_rofixup_list_adjust
+	add	a3, a3, a10
+	mov	a4, a12
+	call0	.Lcrt_fdpic_bootstrap_map
+	beqi	a2, -1, .Lcrt_fdpic_bootstrap_fail
+	mov	a3, a2
+	mov	a2, a15
+	l32r	a10, .Lcrt_fdpic_rofixup_end_delta
+	l32r	a9, .Lcrt_fdpic_rofixup_end_adjust
+	add	a10, a10, a9
+	mov	a4, a12
+	mov	a3, a10
+	call0	.Lcrt_fdpic_bootstrap_map
+	beqi	a2, -1, .Lcrt_fdpic_bootstrap_fail
+	mov	a4, a2
+	mov	a2, a12
+	call0	__self_reloc
+	beqi	a2, -1, .Lcrt_fdpic_bootstrap_fail
 	mov	a11, a2
+.Lcrt_fdpic_got_ready:
 	movi	a2, main@GOTOFFFUNCDESC
 	add	a2, a2, a11
 	l32i	a3, sp, 0	/* argc */
@@ -108,6 +131,55 @@ _start:
 	l32i	a0, a0, 0
 	callx0	a0
 	ill
+
+	/* Map a link-time delta from a runtime PC through an independent FDPIC
+	   loadmap.  Bound the kernel-supplied segment count before walking it. */
+	.align	4
+.Lcrt_fdpic_bootstrap_map:
+	l16ui	a5, a4, 0
+	bnez	a5, .Lcrt_fdpic_map_fail
+	l16ui	a5, a4, 2
+	beqz	a5, .Lcrt_fdpic_map_fail
+	movi	a6, 32
+	bltu	a6, a5, .Lcrt_fdpic_map_fail
+	mov	a6, a5
+	addi	a7, a4, 4
+.Lcrt_fdpic_find_runtime:
+	l32i	a8, a7, 0
+	l32i	a9, a7, 8
+	sub	a10, a2, a8
+	bltu	a10, a9, .Lcrt_fdpic_runtime_found
+	addi	a7, a7, 12
+	addi	a6, a6, -1
+	bnez	a6, .Lcrt_fdpic_find_runtime
+	j	.Lcrt_fdpic_map_fail
+.Lcrt_fdpic_runtime_found:
+	l32i	a8, a7, 4
+	add	a3, a3, a8
+	add	a3, a3, a10
+	mov	a6, a5
+	addi	a7, a4, 4
+.Lcrt_fdpic_find_link:
+	l32i	a8, a7, 4
+	l32i	a9, a7, 8
+	sub	a10, a3, a8
+	bltu	a10, a9, .Lcrt_fdpic_link_found
+	bne	a10, a9, .Lcrt_fdpic_link_next
+	beqi	a6, 1, .Lcrt_fdpic_link_found
+.Lcrt_fdpic_link_next:
+	addi	a7, a7, 12
+	addi	a6, a6, -1
+	bnez	a6, .Lcrt_fdpic_find_link
+.Lcrt_fdpic_map_fail:
+	movi	a2, -1
+	ret
+.Lcrt_fdpic_link_found:
+	l32i	a2, a7, 0
+	add	a2, a2, a10
+	ret
+.Lcrt_fdpic_bootstrap_fail:
+	ill
+	j	.Lcrt_fdpic_bootstrap_fail
 
 #else
 #error Unsupported Xtensa ABI
