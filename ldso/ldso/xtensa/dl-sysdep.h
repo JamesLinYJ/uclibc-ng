@@ -184,6 +184,8 @@ elf_machine_load_address (void)
 		*(REL)  = (SYMBOL) + (RELP)->r_addend;		\
 		break;						\
 	case R_XTENSA_RELATIVE:					\
+		*(REL) = DL_RELOC_ADDR((LOAD), *(REL));		\
+		break;						\
 	case R_XTENSA_NONE:					\
 	default:						\
 		break;						\

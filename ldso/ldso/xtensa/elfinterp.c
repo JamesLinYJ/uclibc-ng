@@ -235,7 +235,7 @@ _dl_do_reloc (struct elf_resolve *tpnt, struct r_scope_elem *scope,
 		break;
 
 	case R_XTENSA_RELATIVE:
-		*reloc_addr += DL_RELOC_ADDR(tpnt->loadaddr, rpnt->r_addend);
+		*reloc_addr = DL_RELOC_ADDR(tpnt->loadaddr, *reloc_addr);
 		break;
 
 #ifdef __FDPIC__
