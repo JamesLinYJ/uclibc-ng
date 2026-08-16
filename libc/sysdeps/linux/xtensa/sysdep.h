@@ -168,17 +168,18 @@
 #if defined _LIBC_REENTRANT
 # if defined USE___THREAD
 #ifdef __FDPIC__
-#   define SYSCALL_ERROR_ERRNO errno
 #  define SYSCALL_ERROR_HANDLER						      \
-0:	rur	a4, THREADPTR;						      \
-	movi	a3, SYSCALL_ERROR_ERRNO@GOTTPOFF;			      \
-	.reloc	., R_XTENSA_TLS_TPOFF_PTR, SYSCALL_ERROR_ERRNO;		      \
-	add	a3, a3, a11;						      \
-	.reloc	., R_XTENSA_TLS_TPOFF_LOAD, SYSCALL_ERROR_ERRNO;	      \
-	l32i	a3, a3, 0;						      \
-	neg	a2, a2;							      \
-	add	a4, a4, a3;						      \
-	s32i	a2, a4, 0;						      \
+0:	neg	a2, a2;							      \
+	addi	a1, a1, -16;						      \
+	s32i	a0, a1, 0;						      \
+	s32i	a2, a1, 4;						      \
+	movi	a0, JUMPTARGET(__errno_location);			      \
+	FDPIC_LOAD_JUMPTARGET(a0, a11, a0);				      \
+	callx0	a0;						              \
+	l32i	a0, a1, 0;						      \
+	l32i	a3, a1, 4;						      \
+	addi	a1, a1, 16;						      \
+	s32i	a3, a2, 0;						      \
 	movi	a2, -1;							      \
 	j	.Lpseudo_end;
 #else
