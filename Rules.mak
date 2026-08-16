@@ -519,6 +519,12 @@ endif
 
 ifeq ($(TARGET_ARCH),xtensa)
 	CPU_CFLAGS-$(UCLIBC_FORMAT_FDPIC_ELF) += -mfdpic
+ifeq ($(UCLIBC_FORMAT_FDPIC_ELF),y)
+	# -mfdpic selects the ABI but does not set GCC's PIC compilation mode.
+	# Shared objects need both so local TLS references use writable GOT
+	# descriptors instead of runtime TPOFF relocations in literal pools.
+	PICFLAG += -fPIC
+endif
 endif
 
 $(eval $(call check-gcc-var,$(PIEFLAG_NAME)))
