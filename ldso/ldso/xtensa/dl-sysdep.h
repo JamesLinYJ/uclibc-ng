@@ -135,9 +135,36 @@ while (0)
 #define SEND_EARLY_STDERR(S) \
   do { /* FIXME: implement */; } while (0)
 
+#ifdef ESP32S3_FDPIC_HARVARD_ALIAS
+#define XTENSA_FDPIC_EXEC_ALIAS(address) \
+  _dl_xtensa_fdpic_exec_alias((Elf32_Addr)(address))
+#else
+#define XTENSA_FDPIC_EXEC_ALIAS(address) (address)
+#endif
+
 #undef INIT_GOT
 #include "../fdpic/dl-sysdep.h"
 #undef INIT_GOT
+#ifdef ESP32S3_FDPIC_HARVARD_ALIAS
+#undef DL_INIT_LOADADDR_BOOT
+#define DL_INIT_LOADADDR_BOOT(LOADADDR, BASEADDR) \
+  (_dl_xtensa_init_loadaddr_map(&(LOADADDR), dl_boot_got_pointer, \
+			       dl_boot_ldsomap ?: dl_boot_progmap))
+#undef DL_INIT_LOADADDR_PROG
+#define DL_INIT_LOADADDR_PROG(LOADADDR, BASEADDR) \
+  (_dl_xtensa_init_loadaddr_map(&(LOADADDR), 0, dl_boot_progmap))
+#undef DL_INIT_LOADADDR
+#define DL_INIT_LOADADDR(LOADADDR, BASEADDR, PHDR, PHDRCNT) \
+  (dl_init_loadaddr_load_count = \
+     _dl_xtensa_init_loadaddr(&(LOADADDR), (PHDR), (PHDRCNT)))
+#undef DL_INIT_LOADADDR_HDR
+#define DL_INIT_LOADADDR_HDR(LOADADDR, ADDR, PHDR) \
+  (_dl_xtensa_init_loadaddr_hdr((LOADADDR), (ADDR), (PHDR), \
+			       dl_init_loadaddr_load_count))
+#undef DL_UPDATE_LOADADDR_HDR
+#define DL_UPDATE_LOADADDR_HDR(LOADADDR, ADDR, PHDR) \
+  (_dl_xtensa_update_loadaddr_hdr((LOADADDR), (ADDR), (PHDR)))
+#endif
 #define INIT_GOT(GOT_BASE,MODULE) \
 {				\
   (MODULE)->loadaddr.got_value = (GOT_BASE); \

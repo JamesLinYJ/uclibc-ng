@@ -290,7 +290,8 @@ _dl_start (Elf32_Addr dl_boot_got_pointer, \
  */
 #define START()	do {							\
   struct elf_resolve *exec_mod = _dl_loaded_modules;			\
-  dl_main_funcdesc->entry_point = _dl_elf_main;				\
+  dl_main_funcdesc->entry_point = (void *)				\
+    XTENSA_FDPIC_EXEC_ALIAS((Elf32_Addr)_dl_elf_main);			\
   while (exec_mod->libtype != elf_executable)				\
     exec_mod = exec_mod->next;						\
   dl_main_funcdesc->got_value = exec_mod->loadaddr.got_value;		\
