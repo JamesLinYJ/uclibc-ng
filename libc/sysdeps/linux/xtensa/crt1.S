@@ -34,6 +34,7 @@
    <http://www.gnu.org/licenses/>.  */
 
 #include <features.h>
+#include <fdpic-loadmap.h>
 
 #if defined(__FDPIC__)
 
@@ -98,7 +99,8 @@ _start:
 	mov	a4, a12
 	call0	.Lcrt_fdpic_bootstrap_map
 	beqi	a2, -1, .Lcrt_fdpic_bootstrap_fail
-	mov	a3, a2
+	addi	sp, sp, -16
+	s32i	a2, sp, 0
 	mov	a2, a15
 	l32r	a10, .Lcrt_fdpic_rofixup_end_delta
 	l32r	a9, .Lcrt_fdpic_rofixup_end_adjust
@@ -108,6 +110,8 @@ _start:
 	call0	.Lcrt_fdpic_bootstrap_map
 	beqi	a2, -1, .Lcrt_fdpic_bootstrap_fail
 	mov	a4, a2
+	l32i	a3, sp, 0
+	addi	sp, sp, 16
 	mov	a2, a12
 	call0	__self_reloc
 	beqi	a2, -1, .Lcrt_fdpic_bootstrap_fail
@@ -136,11 +140,13 @@ _start:
 	   loadmap.  Bound the kernel-supplied segment count before walking it. */
 	.align	4
 .Lcrt_fdpic_bootstrap_map:
+	beqz	a4, .Lcrt_fdpic_map_fail
 	l16ui	a5, a4, 0
 	bnez	a5, .Lcrt_fdpic_map_fail
 	l16ui	a5, a4, 2
 	beqz	a5, .Lcrt_fdpic_map_fail
-	movi	a6, 32
+	movi	a6, -XTENSA_FDPIC_MAX_LOADSEGS
+	neg	a6, a6
 	bltu	a6, a5, .Lcrt_fdpic_map_fail
 	mov	a6, a5
 	addi	a7, a4, 4

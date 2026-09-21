@@ -215,9 +215,16 @@ elf_machine_load_address (void)
 	case R_XTENSA_RELATIVE:					\
 		*(REL) = DL_RELOC_ADDR((LOAD), *(REL));		\
 		break;						\
-	case R_XTENSA_NONE:					\
-	default:						\
+	case R_XTENSA_FUNCDESC_VALUE: {				\
+		struct funcdesc_value *dst = (void *)(REL);	\
+		dst->entry_point = (void *)((SYMBOL) + (RELP)->r_addend); \
+		dst->got_value = (LOAD).got_value;			\
 		break;						\
+	}							\
+	case R_XTENSA_NONE:					\
+		break;						\
+	default:						\
+		_dl_exit(1);					\
 	}
 
 static __always_inline void

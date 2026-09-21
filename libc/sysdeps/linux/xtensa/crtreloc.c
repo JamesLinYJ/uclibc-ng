@@ -29,77 +29,107 @@ not, see <http://www.gnu.org/licenses/>.  */
 
 #include <sys/types.h>
 #include <link.h>
+#include <fdpic-loadmap.h>
 
-/* This file is to be compiled into crt object files, to enable
-   executables to easily self-relocate.  */
-
-/* Compute the runtime address of pointer in the range [p,e), and then
-   map the pointer pointed by it.  */
-static __always_inline void ***
-reloc_range_indirect (void ***p, void ***e,
-		      const struct elf32_fdpic_loadmap *map)
+/* Require an entire interval in one mapped segment, with no pointer wrapping. */
+static __always_inline int
+reloc_range_valid (const struct elf32_fdpic_loadmap *map,
+                   const void *p, const void *e)
 {
-  while (p < e)
+  unsigned long start = (unsigned long)p, end = (unsigned long)e;
+  unsigned int i;
+
+  if (!map || map->version || !map->nsegs ||
+      map->nsegs > XTENSA_FDPIC_MAX_LOADSEGS || end <= start)
+    return 0;
+  for (i = 0; i < map->nsegs; i++)
     {
-      if (*p != (void **)-1)
-	{
-	  void *ptr = __reloc_pointer (*p, map);
-
-	  if (ptr != (void *)-1)
-	    {
-	      unsigned long off = ((unsigned long)ptr & 3) * 8;
-	      unsigned long *pa = (unsigned long *)((unsigned long)ptr & -4);
-	      unsigned long v2;
-	      void *pt;
-
-	      if (off)
-		{
-		  unsigned long v0, v1;
-#ifdef __XTENSA_EB__
-		  v0 = pa[1]; v1 = pa[0];
-		  v2 = (v1 >> (32 - off)) | (v0 << off);
-#else /* __XTENSA_EL__ */
-		  v0 = pa[0]; v1 = pa[1];
-		  v2 = (v0 << (32 - off)) | (v1 >> off);
-#endif
-		  pt = (void *)((v1 << (32 - off)) | (v0 >> off));
-		}
-	      else
-		pt = *(void**)ptr;
-	      pt = __reloc_pointer (pt, map);
-	      if (off)
-		{
-		  unsigned long v = (unsigned long)pt;
-#ifdef __XTENSA_EB__
-		  pa[0] = (v2 << (32 - off)) | (v >> off);
-		  pa[1] = (v << (32 - off)) | (v2 >> off);
-#else /* __XTENSA_EL__ */
-		  pa[0] = (v2 >> (32 - off)) | (v << off);
-		  pa[1] = (v >> (32 - off)) | (v2 << off);
-#endif
-		}
-	      else
-		*(void**)ptr = pt;
-	    }
-	}
-      p++;
+      unsigned long base = map->segs[i].addr, size = map->segs[i].p_memsz;
+      if (start >= base && start - base < size && end - start <= size - (start - base))
+        return 1;
     }
-  return p;
+  return 0;
 }
 
-/* Call __reloc_range_indirect for the given range except for the last
-   entry, whose contents are only relocated.  It's expected to hold
-   the GOT value.  */
-attribute_hidden void*
-__self_reloc (const struct elf32_fdpic_loadmap *map,
-	      void ***p, void ***e)
+static __always_inline int
+reloc_target_valid (const struct elf32_fdpic_loadmap *map, void *p,
+                    unsigned long size)
 {
-  p = reloc_range_indirect (p, e-1, map);
+  unsigned long address = (unsigned long)p;
 
-  if (p >= e)
-    return (void*)-1;
+  if (!size || address + size < address)
+    return 0;
+#ifdef ESP32S3_FDPIC_HARVARD_ALIAS
+  /* The loader contract reserves this DBus bank for writable PSRAM.
+     Reject both Flash data and every instruction-only alias. */
+  if ((address >> 22) - 0xf1UL >= 2 ||
+      ((address + size - 1) >> 22) - 0xf1UL >= 2)
+    return 0;
+#endif
+  return reloc_range_valid (map, p, (void *)(address + size));
+}
 
-  return __reloc_pointer (*p, map);
+/* Relocate exactly four bytes, including unaligned targets, without touching
+   neighbouring objects. This runs before libc/GOT initialization. */
+static __always_inline int
+reloc_range_indirect (void ***p, void ***e,
+                      const struct elf32_fdpic_loadmap *map)
+{
+  for (; p < e; p++)
+    {
+      unsigned char *target;
+      unsigned long value = 0;
+      void *translated;
+      unsigned int i;
+
+      if (*p == (void **)-1)
+        continue;
+      target = __reloc_pointer (*p, map);
+      if (!reloc_target_valid (map, target, sizeof (unsigned long)))
+        return 0;
+      for (i = 0; i < sizeof (unsigned long); i++)
+        {
+#ifdef __XTENSA_EB__
+          value = (value << 8) | target[i];
+#else
+          value |= (unsigned long)target[i] << (i * 8);
+#endif
+        }
+      translated = __reloc_pointer ((void *)value, map);
+      if (translated == (void *)-1)
+        return 0;
+      value = (unsigned long)translated;
+      for (i = 0; i < sizeof (unsigned long); i++)
+        {
+#ifdef __XTENSA_EB__
+          target[i] = value >> ((sizeof (unsigned long) - 1 - i) * 8);
+#else
+          target[i] = value >> (i * 8);
+#endif
+        }
+    }
+  return 1;
+}
+
+attribute_hidden void *
+__self_reloc (const struct elf32_fdpic_loadmap *map, void ***p, void ***e)
+{
+  void *got;
+
+  if (!reloc_range_valid (map, p, e) ||
+      ((unsigned long)p & (sizeof (void *) - 1)) ||
+      ((unsigned long)e - (unsigned long)p) % sizeof (void *))
+    return (void *)-1;
+#ifdef ESP32S3_FDPIC_HARVARD_ALIAS
+  if ((unsigned long)p >> 25 != 0x1e ||
+      ((unsigned long)e - 1) >> 25 != 0x1e)
+    return (void *)-1;
+#endif
+  got = __reloc_pointer (e[-1], map);
+  if (!reloc_target_valid (map, got, 3 * sizeof (void *)) ||
+      !reloc_range_indirect (p, e - 1, map))
+    return (void *)-1;
+  return got;
 }
 
 #endif /* __FDPIC__ */

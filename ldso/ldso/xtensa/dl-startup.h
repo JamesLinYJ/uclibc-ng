@@ -8,6 +8,7 @@
  */
 
 #include <bits/uClibc_page.h>
+#include <fdpic-loadmap.h>
 
 #if defined(__FDPIC__)
 __asm__ (
@@ -52,7 +53,8 @@ __asm__ (
     ".Lfdpic_map_list:\n"
     "	_call0	.Lfdpic_bootstrap_map\n"
     "	beqi	a2, -1, .Lfdpic_bootstrap_fail\n"
-    "	mov	a3, a2\n"
+    "	addi	sp, sp, -16\n"
+    "	s32i	a2, sp, 0\n"
     "	mov	a2, a15\n"
     "	l32r	a10, .Lfdpic_rofixup_end_delta\n"
     "	l32r	a9, .Lfdpic_rofixup_end_adjust\n"
@@ -65,6 +67,8 @@ __asm__ (
     "	_call0	.Lfdpic_bootstrap_map\n"
     "	beqi	a2, -1, .Lfdpic_bootstrap_fail\n"
     "	mov	a4, a2\n"
+    "	l32i	a3, sp, 0\n"
+    "	addi	sp, sp, 16\n"
     "	mov	a2, a13\n"
     "	bnez	a2, .Lfdpic_self_reloc\n"
     "	mov	a2, a12\n"
@@ -99,11 +103,13 @@ __asm__ (
        Flash text and RAM data have independent displacements. */
     "	.align	4\n"
     ".Lfdpic_bootstrap_map:\n"
+    "	beqz	a4, .Lfdpic_map_fail\n"
     "	l16ui	a5, a4, 0\n"
     "	bnez	a5, .Lfdpic_map_fail\n"
     "	l16ui	a5, a4, 2\n"
     "	beqz	a5, .Lfdpic_map_fail\n"
-    "	movi	a6, 32\n"
+    "	movi	a6, -" __XTENSA_FDPIC_STRINGIFY(XTENSA_FDPIC_MAX_LOADSEGS) "\n"
+    "	neg	a6, a6\n"
     "	bltu	a6, a5, .Lfdpic_map_fail\n"
     "	mov	a6, a5\n"
     "	addi	a7, a4, 4\n"

@@ -14,7 +14,7 @@
 #define ESP32S3_FDPIC_WINDOW_SIZE	0x02000000UL
 #define ESP32S3_FDPIC_ALIAS_DELTA	\
 	(ESP32S3_FDPIC_IBUS_BASE - ESP32S3_FDPIC_DBUS_BASE)
-#define ESP32S3_FDPIC_MAX_LOADSEGS	32
+#include <fdpic-loadmap.h>
 
 /*
  * These are virtual aperture bounds, not installed RAM sizes.  Equal
@@ -41,7 +41,7 @@ static __always_inline void
 _dl_xtensa_fdpic_validate_loadmap(const struct elf32_fdpic_loadmap *map)
 {
 	if (!map || map->version != 0 || map->nsegs == 0 ||
-	    map->nsegs > ESP32S3_FDPIC_MAX_LOADSEGS)
+	    map->nsegs > XTENSA_FDPIC_MAX_LOADSEGS)
 		_dl_exit(-1);
 }
 
@@ -60,7 +60,7 @@ _dl_xtensa_init_loadaddr(struct elf32_fdpic_loadaddr *loadaddr,
 {
 	int count = __dl_init_loadaddr(loadaddr, phdr, phnum);
 
-	if (count <= 0 || count > ESP32S3_FDPIC_MAX_LOADSEGS)
+	if (count <= 0 || count > XTENSA_FDPIC_MAX_LOADSEGS)
 		_dl_exit(-1);
 	return count;
 }
