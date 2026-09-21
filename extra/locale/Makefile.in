@@ -150,19 +150,19 @@ endif
 endif
 
 $(locale_DIR)/gen_collate.c: $(DEPH-gen_collate)
-$(locale_OUT)/gen_collate : $(locale_DIR)/gen_collate.c
+$(locale_OUT)/gen_collate : $(locale_DIR)/gen_collate.c $(DEPH-gen_collate)
 	$(hcompile.u)
 $(locale_DIR)/gen_ldc.c: $(DEPH-gen_ldc)
-$(locale_OUT)/gen_ldc : $(locale_DIR)/gen_ldc.c
+$(locale_OUT)/gen_ldc : $(locale_DIR)/gen_ldc.c $(DEPH-gen_ldc)
 	$(hcompile.u)
 $(locale_DIR)/gen_locale.c: $(DEPH-gen_locale)
-$(locale_OUT)/gen_locale : $(locale_DIR)/gen_locale.c
+$(locale_OUT)/gen_locale : $(locale_DIR)/gen_locale.c $(DEPH-gen_locale)
 	$(hcompile.u)
 $(locale_DIR)/gen_wc8bit.c: $(DEPH-gen_wc8bit)
-$(locale_OUT)/gen_wc8bit : $(locale_DIR)/gen_wc8bit.c
+$(locale_OUT)/gen_wc8bit : $(locale_DIR)/gen_wc8bit.c $(DEPH-gen_wc8bit)
 	$(hcompile.u)
 $(locale_DIR)/gen_wctype.c: $(DEPH-gen_wctype)
-$(locale_OUT)/gen_wctype : $(locale_DIR)/gen_wctype.c
+$(locale_OUT)/gen_wctype : $(locale_DIR)/gen_wctype.c $(DEPH-gen_wctype)
 	$(hcompile.u)
 
 ifneq ($(V),)

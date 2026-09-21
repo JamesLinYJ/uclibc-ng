@@ -64,11 +64,15 @@ static __always_inline void
 elf_machine_relative (Elf32_Addr load_off, const Elf32_Addr rel_addr,
 		      Elf32_Word relative_count)
 {
-	Elf32_Rel * rpnt = (void *) rel_addr;
+	Elf32_Rela * rpnt = (void *) rel_addr;
+	--rpnt;
 	do {
-		Elf32_Addr *const reloc_addr = (void *) (load_off + (rpnt)->r_offset);
+		Elf32_Addr *const reloc_addr = (void *) (load_off +
+							 (++rpnt)->r_offset);
 
-		*reloc_addr += load_off;
+		/* The linker leaves the slot zeroed; the addend carries the
+		   link-time value.  */
+		*reloc_addr = load_off + rpnt->r_addend;
 	} while (--relative_count);
 }
 

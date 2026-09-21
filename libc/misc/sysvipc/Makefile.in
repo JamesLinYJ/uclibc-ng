@@ -30,3 +30,6 @@ objclean-y += CLEAN_libc/misc/sysvipc
 
 CLEAN_libc/misc/sysvipc:
 	$(do_rm) $(addprefix $(MISC_SYSVIPC_OUT)/*., o os)
+
+# Same reason as CFLAGS-__socketcall.c: msgrcv() blocks in this multiplexer.
+CFLAGS-__syscall_ipc.c = -fasynchronous-unwind-tables

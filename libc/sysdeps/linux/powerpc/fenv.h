@@ -108,12 +108,6 @@ extern int fesetenv (const fenv_t *__envp) __THROW;
    according to saved exceptions.  */
 extern int feupdateenv (const fenv_t *__envp) __THROW;
 
-
-/* Include optimization.  */
-#ifdef __OPTIMIZE__
-# include <bits/fenvinline.h>
-#endif
-
 #ifdef __USE_GNU
 
 /* Enable individual exceptions.  Will not enable more exceptions than
@@ -128,6 +122,7 @@ extern int fedisableexcept (int __excepts) __THROW;
 
 /* Return enabled exceptions.  */
 extern int fegetexcept (void) __THROW;
+
 #endif
 
 __END_DECLS

@@ -168,12 +168,14 @@ config UCLIBC_HAS_FENV
 		   TARGET_arc || \
 		   TARGET_arm || \
 		   TARGET_csky || \
+		   TARGET_loongarch64 || \
+		   TARGET_kvx || \
 		   TARGET_m68k || \
 		   TARGET_metag || \
 		   TARGET_mips || \
 		   TARGET_nds32 || \
 		   TARGET_or1k || \
-		   (TARGET_powerpc && CONFIG_E500) || \
+		   TARGET_powerpc || \
 		   TARGET_riscv32 || \
 		   TARGET_riscv64 || \
 		   (TARGET_sh && (CONFIG_SH4 || CONFIG_SH4A)) || \

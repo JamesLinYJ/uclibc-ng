@@ -24,15 +24,6 @@
 
 #include <errno.h>
 
-#undef INTERNAL_SYSCALL_DECL
-#define INTERNAL_SYSCALL_DECL(err) unsigned int err __attribute__((unused))
-
-#undef INTERNAL_SYSCALL_ERROR_P
-#define INTERNAL_SYSCALL_ERROR_P(val, err) ((void) (val), (unsigned int) (err))
-
-#undef INTERNAL_SYSCALL_ERRNO
-#define INTERNAL_SYSCALL_ERRNO(val, err)   ((void) (err), val)
-
 #undef INTERNAL_SYSCALL_NCS
 #define INTERNAL_SYSCALL_NCS(name, err, nr, args...)            \
   ({ unsigned int _sys_result;                                  \
@@ -45,8 +36,8 @@
                      : "+r" (_r2), "=r" (_sys_err)              \
                      : ASM_ARGS_##nr				\
                      : "memory");                               \
-       _sys_result = _r2;                                       \
-       err = _sys_err;						\
+       /* r7 signals the error; fold it into a negative return value.  */ \
+       _sys_result = _sys_err ? -_r2 : _r2;			\
      }                                                          \
      (int) _sys_result; })
 

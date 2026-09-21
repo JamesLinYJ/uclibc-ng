@@ -16,19 +16,19 @@
    set, otherwise the kernel returns the ancient struct and e.g. sem_nsems
    comes back as 0.  */
 #  define __IPC_64	0x100
-#elif defined __m68k__ || defined __i386__ || defined __mips__
-/* 5.1+ uses the direct *ctl syscalls, which (unlike ipc()) do not strip
-   IPC_64 -- passing it would make them fail with EINVAL.  mips o32 got them
-   as 394/396/402 and belongs here; n32/n64 are handled above.  */
-# if __LINUX_KERNEL_VERSION < 0x050100
-#  define __IPC_64      0x100
-# else
+#elif defined __m68k__ || defined __i386__ || defined __mips__ \
+   || defined __sh__ || defined __powerpc__ || defined __sparc__ \
+   || defined __hppa__
+/* A direct semctl/msgctl/shmctl pointing at sys_*ctl sets IPC_64 in the
+   kernel and rejects a cmd that carries the bit; without such a number the
+   call goes through ipc(), which reads it out of cmd.  arm, xtensa,
+   microblaze and alpha stay out: their direct number is sys_old_*ctl, which
+   wants the bit either way.  */
+# ifdef __NR_semctl
 #  define __IPC_64      0x0
+# else
+#  define __IPC_64      0x100
 # endif
-#elif defined __hppa__
-/* parisc has no ARCH_WANT_IPC_PARSE_VERSION: the kernel never strips
-   IPC_64, so passing it makes semctl & co. fail with EINVAL.  */
-#  define __IPC_64	0x0
 #else
 # if __WORDSIZE == 32 || defined __alpha__
 #  define __IPC_64	0x100

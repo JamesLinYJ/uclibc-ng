@@ -22,9 +22,12 @@
 #include <tls.h>
 
 
+/* nios2 uses the generic clone argument order, i.e. the child tid pointer
+   comes before the TLS argument -- not last as on arm, where this file was
+   copied from.  */
 #define ARCH_FORK()							\
   INLINE_SYSCALL (clone, 5,						\
 		  CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD,	\
-		  NULL, NULL, NULL, &THREAD_SELF->tid)
+		  NULL, NULL, &THREAD_SELF->tid, NULL)
 
 #include "../fork.c"

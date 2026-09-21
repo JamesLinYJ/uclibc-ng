@@ -24,6 +24,7 @@
    code instead.  */
 
 #include <fenv.h>
+#include <fenv_private.h>
 #include "fenv_libc.h"
 #include <fpu_control.h>
 

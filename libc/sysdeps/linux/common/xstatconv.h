@@ -23,9 +23,12 @@
  * struct stat should look like.  It turns out that each arch has a different
  * opinion on the subject, and different kernel revs use different names... */
 #include <features.h>
+#include <bits/wordsize.h>
+#include <sys/syscall.h>
 #include <bits/kernel_stat.h>
 
-#ifdef __ARCH_HAS_DEPRECATED_SYSCALLS__
+#if defined(__ARCH_HAS_DEPRECATED_SYSCALLS__) \
+    || (defined(__NR_fstat) && !(__WORDSIZE == 64 && defined(__NR_newfstatat)))
 extern void __xstat_conv(struct kernel_stat *kbuf, struct stat *buf) attribute_hidden;
 extern void __xstat32_conv(struct kernel_stat64 *kbuf, struct stat *buf) attribute_hidden;
 extern void __xstat64_conv(struct kernel_stat64 *kbuf, struct stat64 *buf) attribute_hidden;

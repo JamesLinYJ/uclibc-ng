@@ -296,7 +296,9 @@ void __uClibc_init(void)
 #ifndef SHARED
 # ifdef __UCLIBC_HAS_SSP__
     /* Set up the stack checker's canary.  */
-    stack_chk_guard = _dl_setup_stack_chk_guard();
+    stack_chk_guard = _dl_setup_stack_chk_guard(
+    _dl_auxvt[AT_RANDOM].a_type == AT_RANDOM ?
+        (void *)_dl_auxvt[AT_RANDOM].a_un.a_val : NULL);
 #  ifdef THREAD_SET_STACK_GUARD
     THREAD_SET_STACK_GUARD (stack_chk_guard);
 #  else

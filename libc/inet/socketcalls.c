@@ -38,8 +38,9 @@
 #define SYS_SENDMMSG    20
 #endif
 
-/* exposed on x86 since Linux commit 9dea5dc921b5f4045a18c63eb92e84dc274d17eb */
-#if defined(__sparc__) || defined(__i386__)
+/* exposed on x86 since Linux commit 9dea5dc921b5f4045a18c63eb92e84dc274d17eb,
+   so a libc built against newer headers would get ENOSYS on an older kernel */
+#if defined(__i386__)
 #undef __NR_accept
 #undef __NR_accept4
 #undef __NR_bind
@@ -58,6 +59,16 @@
 #undef __NR_shutdown
 #undef __NR_socket
 #undef __NR_socketpair
+#endif
+
+/* sparc has had the socket syscalls from the beginning -- socket is 97,
+   connect 98, accept 99 -- and only bind, listen and setsockopt arrived
+   with the 4.3 work, at 353..355.  Keep those three on the multiplexer
+   for the same reason as i386; none of them is a cancellation point. */
+#if defined(__sparc__)
+#undef __NR_bind
+#undef __NR_listen
+#undef __NR_setsockopt
 #endif
 
 #ifdef L_accept

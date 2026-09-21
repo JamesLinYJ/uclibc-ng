@@ -135,6 +135,7 @@ unsigned int __dl_parse_dynamic_info(ElfW(Dyn) *dpnt, unsigned long dynamic_info
                                      void *debug_addr, DL_LOADADDR_TYPE load_off)
 {
 	unsigned int rtld_flags = 0;
+	ElfW(Dyn) *dyn_start = dpnt;
 
 	for (; dpnt->d_tag; dpnt++) {
 		if (dpnt->d_tag < DT_NUM) {
@@ -214,6 +215,21 @@ unsigned int __dl_parse_dynamic_info(ElfW(Dyn) *dpnt, unsigned long dynamic_info
 		ADJUST_DYN_INFO(DT_JMPREL, load_off);
 #ifdef __LDSO_GNU_HASH_SUPPORT__
 		ADJUST_DYN_INFO(DT_GNU_HASH_IDX, load_off);
+#endif
+#if defined __i386__ || defined __nios2__
+		/* libgcc's unwinder reads DT_PLTGOT out of the section itself
+		   for the DW_EH_PE_datarel base, and only on these two
+		   targets; elsewhere the section is left alone -- on mips it
+		   is even read-only, like the DT_DEBUG store above.  */
+		if (dynamic_info[DT_PLTGOT]) {
+			ElfW(Dyn) *dp;
+
+			for (dp = dyn_start; dp->d_tag != DT_NULL; dp++)
+				if (dp->d_tag == DT_PLTGOT) {
+					dp->d_un.d_ptr = dynamic_info[DT_PLTGOT];
+					break;
+				}
+		}
 #endif
 	}
 #ifdef __DSBT__

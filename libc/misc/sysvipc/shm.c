@@ -50,7 +50,7 @@ void * shmat (int shmid, const void *shmaddr, int shmflg)
     int retval;
     unsigned long raddr;
 
-    retval = __syscall_ipc(IPCOP_shmat, shmid, shmflg, (int) &raddr, (void *) shmaddr, 0);
+    retval = __syscall_ipc(IPCOP_shmat, shmid, shmflg, (long) &raddr, (void *) shmaddr, 0);
     return ((unsigned long int) retval > -(unsigned long int) SHMLBA
 	    ? (void *) retval : (void *) raddr);
 }

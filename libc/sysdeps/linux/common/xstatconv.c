@@ -21,7 +21,18 @@
 
 #include <sys/stat.h>
 #include <string.h>
+#include <sys/syscall.h>
 #include "xstatconv.h"
+
+/* These conversions are only used when the kernel returns the legacy
+   kernel_stat/kernel_stat64 structs, i.e. on arches whose headers still have
+   the old stat syscalls: the classic ARCH_HAS_DEPRECATED_SYSCALLS arches, and
+   a no-deprecated arch built against an old kernel (e.g. nds32 on linux-3.4,
+   which still has __NR_fstat).  Modern asm-generic arches go through
+   statx/fstatat64, never reference these, and have no kernel_stat in their
+   bits/kernel_stat.h -- so compile to nothing there.  */
+#if defined(__ARCH_HAS_DEPRECATED_SYSCALLS__) \
+    || (defined(__NR_fstat) && !(__WORDSIZE == 64 && defined(__NR_newfstatat)))
 
 void __xstat_conv(struct kernel_stat *kbuf, struct stat *buf)
 {
@@ -91,3 +102,5 @@ void __xstat64_conv(struct kernel_stat64 *kbuf, struct stat64 *buf)
 	buf->st_ctim.tv_sec = kbuf->st_ctim.tv_sec;
 	buf->st_ctim.tv_nsec = kbuf->st_ctim.tv_nsec;
 }
+
+#endif /* __ARCH_HAS_DEPRECATED_SYSCALLS__ || __NR_fstat */

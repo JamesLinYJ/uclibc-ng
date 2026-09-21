@@ -19,6 +19,7 @@
 #define _FENV_PRIVATE_H 1
 
 #include <fenv.h>
+#include <fenv_private.h>
 #include "get-rounding-mode.h"
 
 /* The standards only specify one variant of the fenv.h interfaces.

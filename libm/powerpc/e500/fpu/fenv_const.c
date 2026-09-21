@@ -1,6 +1,5 @@
 /* Constants for fenv_bits.h.
    Copyright (C) 2004 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
    Contributed by Aldy Hernandez <aldyh@redhat.com>, 2004.
 
    The GNU C Library is free software; you can redistribute it and/or

@@ -1,7 +1,6 @@
 /* Store current floating-point environment.
    Copyright (C) 2004 Free Software Foundation, Inc.
    Contributed by Aldy Hernandez <aldyh@redhat.com>, 2004
-   This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public

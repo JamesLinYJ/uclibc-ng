@@ -19,6 +19,7 @@
 #define AARCH64_FENV_PRIVATE_H 1
 
 #include <fenv.h>
+#include <fenv_private.h>
 #include <fpu_control.h>
 
 static __always_inline void

@@ -292,6 +292,7 @@ _dl_do_reloc (struct elf_resolve *tpnt,struct r_scope_elem *scope,
 		*reloc_addr = finaladdr - TLS_DTV_OFFSET;
 		break;
 	case R_PPC_TPREL32:
+		CHECK_STATIC_TLS ((struct link_map *) tls_tpnt);
 		*reloc_addr = tls_tpnt->l_tls_offset + finaladdr - TLS_TP_OFFSET;
 		break;
 #endif

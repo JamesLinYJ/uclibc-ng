@@ -82,12 +82,10 @@
 
 # define INTERNAL_VSYSCALL_NO_SYSCALL_FALLBACK(name, err, nr, args...)	      \
   ({									      \
-    long int sc_ret = ENOSYS;						      \
+    long int sc_ret = -ENOSYS;						      \
 									      \
     if (__vdso_##name != NULL)						      \
       sc_ret = INTERNAL_VSYSCALL_NCS (__vdso_##name, err, nr, ##args);	      \
-    else								      \
-      err = 1 << 28;							      \
     sc_ret;								      \
   })
 
@@ -125,8 +123,7 @@
 	 "=&r" (r8), "=&r" (r9), "=&r" (r10), "=&r" (r11), "=&r" (r12)	      \
        : ASM_INPUT_##nr							      \
        : "cr0", "ctr", "lr", "memory");					      \
-    err = (long int) r0;						      \
-    (int) r3;								      \
+    ((long int) r0) & (1 << 28) ? -r3 : r3;				      \
   })
 
 /* Define a macro which expands inline into the wrapper code for a system
@@ -136,9 +133,6 @@
    function call, with the exception of LR (which is needed for the
    "sc; bnslr+" sequence) and CR (where only CR0.SO is clobbered to signal
    an error return status).  */
-
-# undef INTERNAL_SYSCALL_DECL
-# define INTERNAL_SYSCALL_DECL(err) long int err __attribute__((unused))
 
 # define INTERNAL_SYSCALL_NCS(name, err, nr, args...)			\
 (__extension__ \
@@ -163,14 +157,10 @@
 	 "=&r" (r8), "=&r" (r9), "=&r" (r10), "=&r" (r11), "=&r" (r12)	\
        : ASM_INPUT_##nr							\
        : "cr0", "ctr", "memory");					\
-    err = r0;								\
-    (int) r3;								\
+    /* CR0.SO signals the error; fold it into a negative return value.  */ \
+    r0 & (1 << 28) ? -r3 : r3;						\
   }) \
 )
-# define INTERNAL_SYSCALL_ERROR_P(val, err) \
-  ((void) (val), unlikely ((err) & (1 << 28)))
-
-# define INTERNAL_SYSCALL_ERRNO(val, err)     (val)
 
 extern void __illegally_sized_syscall_arg1(void);
 extern void __illegally_sized_syscall_arg2(void);

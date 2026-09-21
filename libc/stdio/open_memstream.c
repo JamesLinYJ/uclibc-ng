@@ -26,7 +26,32 @@ typedef struct {
 	size_t eof;
 	char **bufloc;
 	size_t *sizeloc;
+	size_t saved_at;		/* Where a data byte was replaced by the */
+	char saved_ch;			/* terminator, to put it back later. */
+	char have_saved;
 } __oms_cookie;
+
+/* POSIX wants the terminator in place and the size updated after every
+ * fflush(), but a cookie stream has no flush callback: __stdio_wcommit() only
+ * reaches oms_write() when the FILE buffer holds something.  So both are kept
+ * current at all times instead.  Seeking back over existing data would destroy
+ * the byte at the new position, so that one byte is remembered and restored
+ * once the position moves on -- glibc writes the terminator from its flush hook
+ * (_IO_mem_sync) and leaves the data alone, and programs may rely on that. */
+static void oms_term(register __oms_cookie *c)
+{
+	if (c->have_saved) {
+		c->buf[c->saved_at] = c->saved_ch;
+		c->have_saved = 0;
+	}
+	if (c->pos < c->eof) {
+		c->saved_at = c->pos;
+		c->saved_ch = c->buf[c->pos];
+		c->have_saved = 1;
+	}
+	c->buf[c->pos] = 0;
+	*c->sizeloc = c->pos;
+}
 
 /* Nothing to do here, as memstreams are write-only. */
 /*  static ssize_t oms_read(void *cookie, char *buf, size_t bufsize) */
@@ -57,13 +82,17 @@ static ssize_t oms_write(register void *cookie, const char *buf, size_t bufsize)
 		}
 	}
 
+	/* bufsize is at least 1 here, so the saved byte -- which sits at pos --
+	 * is about to be overwritten and must not be restored. */
+	COOKIE->have_saved = 0;
+
 	memcpy(COOKIE->buf + COOKIE->pos, buf, bufsize);
 	COOKIE->pos += bufsize;
 
 	if (COOKIE->pos > COOKIE->eof) {
-		*COOKIE->sizeloc = COOKIE->eof = COOKIE->pos;
-		COOKIE->buf[COOKIE->eof] = 0; /* Need to nul-terminate. */
+		COOKIE->eof = COOKIE->pos;	/* Buffer defined this far. */
 	}
+	oms_term(COOKIE);
 
 	return bufsize;
 }
@@ -78,8 +107,12 @@ static int oms_seek(register void *cookie, __offmax_t *pos, int whence)
 	 * unless debugging. */
 	assert(((unsigned int) whence) <= 2);
 
+	/* POSIX leaves it implementation-defined whether SEEK_END refers to the
+	 * buffer length or to the size an fflush() would report; glibc uses the
+	 * latter, which for a write-only stream is the position, so both bases are
+	 * the same here.  musl uses the former. */
 	if (whence != SEEK_SET) {
-		p += (whence == SEEK_CUR) ? COOKIE->pos : /* SEEK_END */ COOKIE->eof;
+		p += COOKIE->pos;
 	}
 
 	/* Note: glibc only allows seeking in the buffer.  We'll actually restrict
@@ -105,10 +138,11 @@ static int oms_seek(register void *cookie, __offmax_t *pos, int whence)
 
 	*pos = COOKIE->pos = --leastlen;
 
-	if (leastlen > COOKIE->eof) {
+	if (leastlen > COOKIE->eof) {	/* Seeked past the end: 0-fill the gap. */
 		memset(COOKIE->buf + COOKIE->eof, 0, leastlen - COOKIE->eof);
-		*COOKIE->sizeloc = COOKIE->eof;
+		COOKIE->eof = leastlen;
 	}
+	oms_term(COOKIE);
 
 	return 0;
 }
@@ -142,6 +176,7 @@ FILE *open_memstream(char **bufloc, size_t *sizeloc)
 		*cookie->buf = 0;		/* Set nul terminator for buffer. */
 		*(cookie->bufloc = bufloc) = cookie->buf;
 		*(cookie->sizeloc = sizeloc) = cookie->eof = cookie->pos = 0;
+		cookie->have_saved = 0;
 
 #ifndef __BCC__
 		fp = fopencookie(cookie, "w", _oms_io_funcs);
@@ -153,6 +188,10 @@ FILE *open_memstream(char **bufloc, size_t *sizeloc)
 		 * nothing currently in the FILE's write buffer. */
 
 		if (fp != NULL) {
+			/* POSIX: "The stream associated with a call to
+			 * open_memstream() shall be byte-oriented."  fopencookie()
+			 * leaves it unoriented. */
+			__STDIO_STREAM_SET_NARROW(fp);
 			__STDIO_STREAM_VALIDATE(fp);
 			return fp;
 		}

@@ -28,6 +28,53 @@
 __UCLIBC_MUTEX_STATIC(_dl_iterate_phdr_lock,
 		      PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP);
 
+#ifndef __ARCH_HAS_NO_SHARED__
+/* The kernel's vDSO is not a loaded module, so the list above does not
+   cover it -- but the signal trampoline the kernel returns through lives
+   there, and only the vDSO's own program headers describe its unwind
+   tables.  Report it like glibc does, so that unwinding out of a signal
+   handler works.  */
+static int
+iterate_vdso (int (*callback) (struct dl_phdr_info *info, size_t size, void *data),
+	      void *data, unsigned long long adds, unsigned long long subs)
+{
+/* Not on FDPIC and DSBT, where dlpi_addr is a load map rather than an
+   address (see include/link.h): the vDSO would need a map of its own, and
+   those targets never get one -- the load map exists because there is no
+   MMU, and the kernel provides a vDSO only when there is.  */
+#if !defined(__FRV_FDPIC__) && !defined(__BFIN_FDPIC__) && !defined(__FDPIC__) \
+    && !defined(__DSBT__)
+	ElfW(Ehdr) *ehdr = (ElfW(Ehdr) *) _dl_auxvt[AT_SYSINFO_EHDR].a_un.a_val;
+	ElfW(Phdr) *phdr;
+	struct dl_phdr_info info;
+	size_t i;
+
+	if (_dl_auxvt[AT_SYSINFO_EHDR].a_type != AT_SYSINFO_EHDR || ehdr == NULL)
+		return 0;
+
+	phdr = (ElfW(Phdr) *) ((char *) ehdr + ehdr->e_phoff);
+	info.dlpi_addr = (ElfW(Addr)) ehdr;
+	for (i = 0; i < ehdr->e_phnum; i++)
+		if (phdr[i].p_type == PT_LOAD) {
+			/* The load bias, as for any other ET_DYN object.  */
+			info.dlpi_addr = (ElfW(Addr)) ehdr - phdr[i].p_vaddr;
+			break;
+		}
+	info.dlpi_name = "linux-vdso.so.1";
+	info.dlpi_phdr = phdr;
+	info.dlpi_phnum = ehdr->e_phnum;
+	info.dlpi_adds = adds;
+	info.dlpi_subs = subs;
+	info.dlpi_tls_modid = 0;
+	info.dlpi_tls_data = NULL;
+
+	return callback (&info, sizeof (struct dl_phdr_info), data);
+#else
+	return 0;
+#endif
+}
+#endif
+
 static int
 __dl_iterate_phdr (int (*callback) (struct dl_phdr_info *info, size_t size, void *data), void *data)
 {
@@ -60,6 +107,8 @@ __dl_iterate_phdr (int (*callback) (struct dl_phdr_info *info, size_t size, void
 		if (ret)
 			break;
 	}
+	if (ret == 0)
+		ret = iterate_vdso (callback, data, _dl_load_adds, _dl_load_subs);
 	__UCLIBC_MUTEX_CONDITIONAL_UNLOCK(_dl_iterate_phdr_lock, 1);
 #endif
 	return ret;

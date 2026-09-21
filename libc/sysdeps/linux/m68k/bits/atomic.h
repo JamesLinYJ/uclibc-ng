@@ -3,13 +3,15 @@
 
    Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
 
-   m68k (68020 and up, which is everything the MMU Linux port runs on) has
-   the CAS instruction.  We implement the compare-and-exchange primitive
-   with cas.b/cas.w/cas.l; include/atomic.h derives every higher-level
-   operation from it.
+   The CAS instruction arrived with the 68020.  Where it exists we implement
+   the compare-and-exchange primitive with cas.b/cas.w/cas.l and let
+   include/atomic.h derive every higher-level operation from it.
 
-   ColdFire has no CAS at all, so there we use the kernel's
-   atomic_cmpxchg_32 helper, which exists for exactly this reason.
+   ColdFire, 68000 and 68010 have no atomic read-modify-write instruction at
+   all.  There we use the kernel's atomic_cmpxchg_32 helper, which exists for
+   exactly this reason and is available on every m68k (syscall 335, "common"
+   in arch/m68k/kernel/syscalls/syscall.tbl, with an implementation for both
+   the MMU and the noMMU port).
 
    Without this file m68k fell back to the generic non-atomic
    bits/atomic.h, whose "atomic" compare-and-exchange is a plain
@@ -22,7 +24,17 @@
 #define _M68K_BITS_ATOMIC_H	1
 
 #include <stdint.h>
-#ifdef __mcoldfire__
+
+/* CAS came with the 68020.  gcc sets a separate macro per core and does not
+   imply __mc68020__ on the later ones, hence the list; __mc68000__ is no help
+   here, it is defined on every m68k, the 68040 and ColdFire included.
+   Everything without CAS - ColdFire, 68000, 68010 - uses the kernel helper.  */
+#if defined __mc68020__ || defined __mc68030__ \
+    || defined __mc68040__ || defined __mc68060__
+# define __M68K_HAVE_CAS	1
+#endif
+
+#ifndef __M68K_HAVE_CAS
 # include <sys/syscall.h>
 #endif
 
@@ -58,7 +70,7 @@ typedef uintmax_t uatomic_max_t;
 #define atomic_read_barrier()	atomic_full_barrier ()
 #define atomic_write_barrier()	atomic_full_barrier ()
 
-#ifndef __mcoldfire__
+#ifdef __M68K_HAVE_CAS
 
 /* cas Dc,Du,<ea>: compare <ea> with Dc; if equal store Du, else load <ea>
    into Dc.  Either way Dc ends up holding the original *MEM, which is the
@@ -87,7 +99,7 @@ typedef uintmax_t uatomic_max_t;
 		       : "memory");					\
      __ret; })
 
-#else /* __mcoldfire__ */
+#else /* !__M68K_HAVE_CAS */
 
 /* d0 = syscall number, d1 = newval, d2 = oldval, a0 = mem; the helper
    returns the previous value.  The swap happens inside the syscall, so
@@ -116,7 +128,7 @@ typedef uintmax_t uatomic_max_t;
 #define __arch_compare_and_exchange_val_16_acq(mem, newval, oldval) \
   __arch_compare_and_exchange_val_8_acq (mem, newval, oldval)
 
-#endif /* __mcoldfire__ */
+#endif /* __M68K_HAVE_CAS */
 
 /* m68k has no 64-bit CAS; NPTL and include/atomic.h only use int- and
    pointer-sized objects, so the bysize dispatch never reaches this.  */

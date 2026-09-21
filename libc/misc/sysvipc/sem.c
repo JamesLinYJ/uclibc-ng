@@ -58,17 +58,27 @@ int semctl(int semid, int semnum, int cmd, ...)
 #ifdef __NR_semctl
     int __ret = __semctl(semid, semnum, cmd | __IPC_64, arg.__pad);
 #if (__WORDSIZE == 32) && defined(__UCLIBC_USE_TIME64__)
-    // Only when cmd is IPC_STAT and IPC_SET, semun points to struct semid_ds.
-    // At this point, arg.__pad should not be NULL, but a check is added just
-    // to be safe.
-    if ((cmd & (IPC_STAT | IPC_SET)) && (arg.__pad != NULL)) {
+    /* IPC_STAT and SEM_STAT are the commands the kernel answers with a
+       struct semid_ds.  For every other one the fourth argument has a
+       different type, or the caller passed none at all.  */
+    if ((cmd == IPC_STAT || cmd == SEM_STAT) && arg.buf != NULL) {
         arg.buf->sem_otime = (__time_t)arg.buf->__sem_otime_internal_1 | (__time_t)(arg.buf->__sem_otime_internal_2) << 32;
         arg.buf->sem_ctime = (__time_t)arg.buf->__sem_ctime_internal_1 | (__time_t)(arg.buf->__sem_ctime_internal_2) << 32;
     }
 #endif
     return __ret;
 #else
+# if defined __sparc__ && defined __arch64__
+    /* sparc64 has its own demultiplexer, sys_sparc_ipc() in
+       arch/sparc/kernel/sys_sparc_64.c: for SEMCTL it hands ptr straight to
+       sys_semctl() as the semun argument, where the generic sys_ipc() reads
+       the argument through it with get_user().  Passing &arg there makes the
+       kernel write the semid_ds over the union itself -- and it sets IPC_64
+       on its own, so the bit does not matter.  */
+    return __syscall_ipc(IPCOP_semctl, semid, semnum, cmd, arg.__pad, NULL);
+# else
     return __syscall_ipc(IPCOP_semctl, semid, semnum, cmd|__IPC_64, &arg, NULL);
+# endif
 #endif
 }
 #endif

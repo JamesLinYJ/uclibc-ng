@@ -78,7 +78,8 @@ __thread_start:
 	mov	%g0, %fp	/* terminate backtrace */
 	call	%g2
 	 mov	%g3,%o0
-	call	exit,0
+	set	__NR_exit, %g1
+	ta	0x10
 	 nop
 
 	.size	__thread_start, .-__thread_start

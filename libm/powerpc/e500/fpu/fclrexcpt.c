@@ -1,6 +1,5 @@
 /* Clear given exceptions in current floating-point environment.
    Copyright (C) 2004 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public

@@ -66,6 +66,14 @@ _start:
 	/* Push rtld_fini */
 	stw	r4, 4(sp)
 
+	/* Push app_fini, and pass app_init in r7.  __uClibc_main() runs the
+	   init arrays itself; these two are the legacy .init/.fini sections.
+	   They have to be set: after exec the kernel hands us zeroed
+	   registers, but ld.so does not, so leaving them alone means calling
+	   whatever the loader left behind.  */
+	stw	zero, 0(sp)
+	mov	r7, zero
+
 	/* Set up the GOT pointer.  */
 	nextpc	r22
 1:	movhi	r2, %hiadj(_gp_got - 1b)

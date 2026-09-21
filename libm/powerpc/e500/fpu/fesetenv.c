@@ -1,6 +1,5 @@
 /* Install given floating-point environment.
    Copyright (C) 1997,99,2000,01,02 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -21,7 +20,7 @@
 #include <sys/prctl.h>
 
 int
-__fesetenv (const fenv_t *envp)
+fesetenv (const fenv_t *envp)
 {
   fenv_union_t u;
   INTERNAL_SYSCALL_DECL (err);
@@ -33,5 +32,3 @@ __fesetenv (const fenv_t *envp)
   /* Success.  */
   return 0;
 }
-
-libm_hidden_ver (__fesetenv, fesetenv)

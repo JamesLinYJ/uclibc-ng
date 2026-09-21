@@ -19,6 +19,7 @@
 #define CSKY_FENV_PRIVATE_H 1
 
 #include <fenv.h>
+#include <fenv_private.h>
 #include <fpu_control.h>
 #include "fenv_libc.h"
 

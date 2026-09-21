@@ -75,11 +75,20 @@ static inline ssize_t do_msgrcv (int msqid, void *msgp, size_t msgsz,
 #ifdef __NR_msgrcv
     return __syscall_msgrcv(msqid, msgp, msgsz, msgtyp, msgflg);
 #else
+# if defined __sparc__ && defined __arch64__
+    /* sys_sparc_ipc() passes ptr and fifth straight to sys_msgrcv(), where the
+       generic sys_ipc() expects the ipc_kludge struct below and reads msgp and
+       msgtyp out of it.  Handing it &temp there makes the kernel deliver the
+       message into that 16-byte struct instead of the caller's buffer.  */
+    return __syscall_ipc(IPCOP_msgrcv, msqid, msgsz, msgflg, msgp,
+			 (void *) msgtyp);
+# else
     struct new_msg_buf temp;
 
     temp.r_msgtyp = msgtyp;
     temp.oldmsg = msgp;
     return __syscall_ipc(IPCOP_msgrcv ,msqid ,msgsz ,msgflg ,&temp, 0);
+# endif
 #endif
 }
 ssize_t msgrcv (int msqid, void *msgp, size_t msgsz,

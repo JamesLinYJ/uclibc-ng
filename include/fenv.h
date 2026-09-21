@@ -1,5 +1,4 @@
 /* Copyright (C) 1997, 1999, 2000 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -109,12 +108,6 @@ extern int fesetenv (const fenv_t *__envp) __THROW;
    according to saved exceptions.  */
 extern int feupdateenv (const fenv_t *__envp) __THROW;
 
-
-/* Include optimization.  */
-#ifdef __OPTIMIZE__
-# include <bits/fenvinline.h>
-#endif
-
 #ifdef __USE_GNU
 
 /* Enable individual exceptions.  Will not enable more exceptions than
@@ -129,16 +122,8 @@ extern int fedisableexcept (int __excepts) __THROW;
 
 /* Return enabled exceptions.  */
 extern int fegetexcept (void) __THROW;
-#endif
 
-/* Rounding mode context.  This allows functions to set/restore rounding mode
-   only when the desired rounding mode is different from the current rounding
-   mode.  */
-struct rm_ctx
-{
-  fenv_t env;
-  bool updated_status;
-};
+#endif
 
 __END_DECLS
 

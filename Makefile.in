@@ -263,7 +263,7 @@ HEADERS_RM-$(UCLIBC_HAS_ARGP)                += argp.h
 HEADERS_RM-$(UCLIBC_HAS_BSD_ERR)             += err.h
 HEADERS_RM-$(UCLIBC_HAS_CRYPT)               += crypt.h
 HEADERS_RM-$(UCLIBC_HAS_EPOLL)               += sys/epoll.h
-HEADERS_RM-$(UCLIBC_HAS_FENV)                += fenv.h bits/fenv.h bits/fenvinline.h
+HEADERS_RM-$(UCLIBC_HAS_FENV)                += fenv.h bits/fenv.h
 HEADERS_RM-$(UCLIBC_HAS_FLOATS)              += complex.h fpu_control.h ieee754.h \
 	math.h \
 	tgmath.h \

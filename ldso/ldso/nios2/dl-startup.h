@@ -78,6 +78,9 @@ __asm__ (
 "        addi r10, r10, 8\n"
 "        bne r11, zero, 4b\n"
 "\n"
+"        /* Pass our FINI ptr() to the user in r4, as crt1.S expects.  */\n"
+"        ldw r4, %call(_dl_fini)(r22)\n"
+"\n"
 "        /* Jump to the user's entry point.  */\n"
 "        jmp r16\n"
 );

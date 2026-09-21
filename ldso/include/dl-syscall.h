@@ -260,18 +260,6 @@ _dl_pread(int fd, void *buf, size_t count, off_t offset)
 }
 #endif
 
-#ifdef __UCLIBC_HAS_SSP__
-# include <sys/time.h>
-# define __NR__dl_gettimeofday __NR_gettimeofday
-static __always_inline _syscall2(int, _dl_gettimeofday, struct timeval *, tv,
-# ifdef __USE_BSD
-                        struct timezone *
-# else
-                        void *
-# endif
-						, tz)
-#endif
-
 /* Some architectures always use 12 as page shift for mmap2() eventhough the
  * real PAGE_SHIFT != 12.  Other architectures use the same value as
  * PAGE_SHIFT...

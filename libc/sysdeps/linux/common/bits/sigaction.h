@@ -20,8 +20,16 @@
 # error "Never include <bits/sigaction.h> directly; use <signal.h> instead."
 #endif
 
+/* These kernels have no sa_restorer in the struct that rt_sigaction expects
+ * (asm-generic/signal.h without SA_RESTORER).  sigaction() hands ours to
+ * the kernel unchanged, so the field must not precede sa_mask there.  */
+#if defined __riscv || defined __csky__ || defined __microblaze__ \
+ || defined __or1k__ || defined __nds32__ || defined __kvx__
+# define __UCLIBC_NO_KERNEL_SA_RESTORER__ 1
+#endif
+
 /* Structure describing the action to be taken when a signal arrives.
- * In uclibc, it is identical to "new" struct kernel_sigaction
+ * In uclibc, it is identical up to sa_mask to "new" struct kernel_sigaction
  * (one from the Linux 2.1.68 kernel).
  * This minimizes amount of translation in sigaction().
  */
@@ -37,8 +45,15 @@ struct sigaction {
 	__sighandler_t  sa_handler;
 #endif
 	unsigned long   sa_flags;
+#ifdef __UCLIBC_NO_KERNEL_SA_RESTORER__
+	/* Behind the mask: the kernel copies only its own size, so it never
+	   reads or writes this field.  */
+	sigset_t        sa_mask;
+	void            (*sa_restorer)(void);
+#else
 	void            (*sa_restorer)(void);
 	sigset_t        sa_mask;
+#endif
 };
 
 /* Bits in `sa_flags'.  */

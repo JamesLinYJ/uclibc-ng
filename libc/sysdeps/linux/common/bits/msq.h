@@ -34,6 +34,10 @@ typedef unsigned long int msglen_t;
 
 /* Structure of record for one message inside the kernel.
    The type `struct msg' is opaque.  */
+
+/* The kernel keeps the upper half of each time field in a separate word on
+   32-bit targets -- see asm-generic/msgbuf.h -- and a single long on 64-bit
+   ones, where the pad words below must not exist.  */
 struct msqid_ds
 {
   struct ipc_perm msg_perm;	/* structure describing operation permission */
@@ -46,11 +50,17 @@ struct msqid_ds
   unsigned long int msg_ctime_internal_2;
 #else
   __time_t msg_stime;		/* time of last msgsnd command */
+# if __WORDSIZE == 32
   unsigned long int __uclibc_unused1;
+# endif
   __time_t msg_rtime;		/* time of last msgrcv command */
+# if __WORDSIZE == 32
   unsigned long int __uclibc_unused2;
+# endif
   __time_t msg_ctime;		/* time of last change */
+# if __WORDSIZE == 32
   unsigned long int __uclibc_unused3;
+# endif
 #endif
   unsigned long int __msg_cbytes; /* current number of bytes on queue */
   msgqnum_t msg_qnum;		/* number of messages currently on queue */

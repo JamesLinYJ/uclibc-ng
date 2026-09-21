@@ -33,6 +33,8 @@
 ENTRY(__clone)
 	/* Sanity check arguments.  */
 	movi	r2, EINVAL
+	beq	r4, zero, .Lerror	/* No NULL function pointers.  */
+	beq	r5, zero, .Lerror	/* No NULL stack pointers.  */
 
 	subi	r5, r5, 8	/* Reserve argument save space.  */
 	stw	r4, 4(r5)	/* Save function pointer.  */
@@ -49,10 +51,26 @@ ENTRY(__clone)
 
 	trap
 
+	/* Check for error: nios2 flags it in r7 and returns the errno in r2.  */
+	bne	r7, zero, .Lerror
 	/* See if we're on the newly created thread.  */
 	beq	r2, zero, thread_start
 	/* Successful return from the parent */
 	ret
+
+.Lerror:
+	/* __syscall_error expects the negated error number.  */
+	sub	r4, zero, r2
+#ifdef __PIC__
+	nextpc	r22
+1:	movhi	r8, %hiadj(_gp_got - 1b)
+	addi	r8, r8, %lo(_gp_got - 1b)
+	add	r22, r22, r8
+	ldw	r8, %call(__syscall_error)(r22)
+	jmp	r8
+#else
+	jmpi	__syscall_error
+#endif
 
 thread_start:
 	/* We expect the argument registers to be preserved across system

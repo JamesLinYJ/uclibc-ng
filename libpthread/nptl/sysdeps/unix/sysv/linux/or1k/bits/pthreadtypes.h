@@ -128,12 +128,14 @@ typedef union
     unsigned int __writer_wakeup;
     unsigned int __nr_readers_queued;
     unsigned int __nr_writers_queued;
+    /* or1k is big endian, so this is the big endian order, like powerpc
+       and sparc.  */
+    unsigned char __pad1;
+    unsigned char __pad2;
+    unsigned char __shared;
     /* FLAGS must stay at this position in the structure to maintain
        binary compatibility.  */
     unsigned char __flags;
-    unsigned char __shared;
-    unsigned char __pad1;
-    unsigned char __pad2;
     int __writer;
   } __data;
   char __size[__SIZEOF_PTHREAD_RWLOCK_T];

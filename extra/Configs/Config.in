@@ -29,8 +29,8 @@ choice
 	default TARGET_i386 if DESIRED_TARGET_ARCH = "i386"
 	default TARGET_ia64 if DESIRED_TARGET_ARCH = "ia64"
 	default TARGET_kvx if DESIRED_TARGET_ARCH = "kvx"
+	default TARGET_loongarch64 if DESIRED_TARGET_ARCH = "loongarch64"
 	default TARGET_lm32 if DESIRED_TARGET_ARCH = "lm32"
-	default TARGET_loongarch if DESIRED_TARGET_ARCH = "loongarch"
 	default TARGET_m68k if DESIRED_TARGET_ARCH = "m68k"
 	default TARGET_metag if DESIRED_TARGET_ARCH = "metag"
 	default TARGET_microblaze if DESIRED_TARGET_ARCH = "microblaze"
@@ -97,11 +97,11 @@ config TARGET_ia64
 config TARGET_kvx
 	bool "kvx"
 
+config TARGET_loongarch64
+	bool "loongarch64"
+
 config TARGET_lm32
 	bool "lm32"
-
-config TARGET_loongarch
-	bool "loongarch"
 
 config TARGET_m68k
 	bool "m68k"
@@ -167,6 +167,7 @@ config TARGET_ARCH_BITS
 	int
 	default 64 if TARGET_aarch64
 	default 64 if TARGET_ia64
+	default 64 if TARGET_loongarch64
 	default 64 if TARGET_powerpc64
 	default 64 if TARGET_riscv64
 	default 64 if TARGET_sparc64
@@ -229,12 +230,12 @@ if TARGET_kvx
 source "extra/Configs/Config.kvx"
 endif
 
-if TARGET_lm32
-source "extra/Configs/Config.lm32"
+if TARGET_loongarch64
+source "extra/Configs/Config.loongarch64"
 endif
 
-if TARGET_loongarch
-source "extra/Configs/Config.loongarch"
+if TARGET_lm32
+source "extra/Configs/Config.lm32"
 endif
 
 if TARGET_m68k
@@ -1860,7 +1861,7 @@ config UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION
 	  fflush function or to a file positioning function (fseek, fsetpos,
 	  or rewind), and input shall not be directly followed by output without
 	  an intervening call to a file positioning function, unless the input
-	  operation encounters end­of­file.
+	  operation encounters endoffile.
 
 	  Most people will answer Y.
 
@@ -2209,16 +2210,6 @@ config UCLIBC_HAS_SSP
 	  without increasing code size.  This option essentially adds debugging
 	  code to catch them.
 
-	  Most people will answer N.
-
-config SSP_QUICK_CANARY
-	bool "Use simple guard values without accessing /dev/urandom"
-	depends on UCLIBC_HAS_SSP
-	help
-	  Use gettimeofday(2) to define the __guard without accessing
-	  /dev/urandom.
-	  WARNING: This makes smashing stack protector vulnerable to timing
-	  	attacks.
 	  Most people will answer N.
 
 choice

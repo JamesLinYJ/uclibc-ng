@@ -30,6 +30,10 @@
 
 #include "ldso.h"
 
+/* The nios2 psABI biases both TLS offsets, as powerpc does.  */
+#define TLS_DTV_OFFSET 0x8000
+#define TLS_TP_OFFSET 0x7000
+
 /* Program to load an ELF binary on a linux system, and run it.
    References to symbols in sharable libraries can be resolved by either
    an ELF sharable library or a linux style of shared library. */
@@ -208,6 +212,22 @@ _dl_do_reloc(struct elf_resolve *tpnt, struct r_scope_elem *scope,
 		case R_NIOS2_RELATIVE:
 			*reloc_addr = (unsigned long)tpnt->loadaddr + rpnt->r_addend;
 			break;
+
+#if defined USE_TLS && USE_TLS
+		case R_NIOS2_TLS_DTPMOD:
+			*reloc_addr = tls_tpnt->l_tls_modid;
+			break;
+
+		case R_NIOS2_TLS_DTPREL:
+			*reloc_addr = symbol_addr + rpnt->r_addend - TLS_DTV_OFFSET;
+			break;
+
+		case R_NIOS2_TLS_TPREL:
+			CHECK_STATIC_TLS ((struct link_map *) tls_tpnt);
+			*reloc_addr = tls_tpnt->l_tls_offset + symbol_addr
+				      + rpnt->r_addend - TLS_TP_OFFSET;
+			break;
+#endif
 
 		case R_NIOS2_COPY:
 			if (symbol_addr) {

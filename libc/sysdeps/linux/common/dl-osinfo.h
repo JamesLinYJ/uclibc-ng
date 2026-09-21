@@ -21,43 +21,55 @@
 #  ifdef IS_IN_libc
 #   include <fcntl.h>
 #   include <unistd.h>
-#   include <sys/time.h>
+#   include <string.h>
 #   define OPEN open
 #   define READ read
 #   define CLOSE close
-#   define GETTIMEOFDAY gettimeofday
+#   define MEMCPY memcpy
 #  else
+#   include <dl-string.h>
 #   define OPEN _dl_open
 #   define READ _dl_read
 #   define CLOSE _dl_close
-#   define GETTIMEOFDAY _dl_gettimeofday
+#   define MEMCPY _dl_memcpy
 #  endif
 
-static __always_inline uintptr_t _dl_setup_stack_chk_guard(void)
+static __always_inline uintptr_t
+_dl_setup_stack_chk_guard(void *dl_random)
 {
-	uintptr_t ret;
-#  ifndef __SSP_QUICK_CANARY__
-	{
+	/* Fallback just the "terminator canary". */
+	uintptr_t ret = 0xFF0A0D00UL;
+
+	/*
+	 * Linux supplies random data through AT_RANDOM.
+	 * Use it directly when available.
+	 */
+	if (dl_random != NULL) {
+		MEMCPY(&ret, dl_random, sizeof(ret));
+	} else {
 		int fd = OPEN("/dev/urandom", O_RDONLY, 0);
-		if (fd >= 0) {
-			size_t size = READ(fd, &ret, sizeof(ret));
-			CLOSE(fd);
-			if (size == (size_t) sizeof(ret))
-				return ret;
-		}
+		if (fd < 0)
+			goto out;
+		uintptr_t tmp;
+		size_t size = READ(fd, &tmp, sizeof(tmp));
+		CLOSE(fd);
+		if (size != sizeof(tmp))
+			goto out;
+		ret = tmp;
 	}
-#  endif /* !__SSP_QUICK_CANARY__ */
+out:
 
-	/* Start with the "terminator canary". */
-	ret = 0xFF0A0D00UL;
+/* Make it harder to leak the canary by ensuring
+ * that the byte with the lowest address is a zero
+ * byte that will stop a rogue strcpy, printf %s, etc*/
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	ret &= ~(uintptr_t)0xff;
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	ret &= ~((uintptr_t)0xff << (8 * (sizeof(ret) - 1)));
+#else
+# error "Unknown byte order"
+#endif
 
-	/* Everything failed? Or we are using a weakened model of the
-	 * terminator canary */
-	{
-		struct timeval tv;
-		if (GETTIMEOFDAY(&tv, NULL) != (-1))
-			ret ^= tv.tv_usec ^ tv.tv_sec;
-	}
 	return ret;
 }
 # endif /* libc || rtld */

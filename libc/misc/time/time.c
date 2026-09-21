@@ -146,6 +146,14 @@
 #include <bits/uClibc_uintmaxtostr.h>
 #include <bits/uClibc_mutex.h>
 
+/* Largest value a time_t can hold, named without assuming its width -- the
+ * places below that need it used to reach for LONG_MAX, which is not the same
+ * thing once UCLIBC_USE_TIME64 gives a 32-bit target a 64-bit time_t.  If
+ * time_t is unsigned this yields half its range, which only makes the tests
+ * that use it trigger earlier, never later. */
+#define TIME_T_MAX \
+	((time_t)(~(uintmax_t)0 >> (8 * (sizeof(uintmax_t) - sizeof(time_t)) + 1)))
+
 #if defined __UCLIBC_HAS_WCHAR__ && (defined L_wcsftime || defined L_wcsftime_l)
 #include <wchar.h>
 # define CHAR_T wchar_t
@@ -493,7 +501,11 @@ char *ctime(const time_t *t)
 	struct tm xtm;
 	memset(&xtm, 0, sizeof(xtm));
 
-	return asctime(localtime_r(t, &xtm));
+	if (localtime_r(t, &xtm) == NULL) {	/* asctime asserts on NULL. */
+		return NULL;
+	}
+
+	return asctime(&xtm);
 }
 libc_hidden_def(ctime)
 #endif
@@ -504,7 +516,11 @@ char *ctime_r(const time_t *t, char *buf)
 {
 	struct tm xtm;
 
-	return asctime_r(localtime_r(t, &xtm), buf);
+	if (localtime_r(t, &xtm) == NULL) {	/* asctime_r asserts on NULL. */
+		return NULL;
+	}
+
+	return asctime_r(&xtm, buf);
 }
 
 #endif
@@ -553,7 +569,11 @@ struct tm *gmtime(const time_t *timer)
 {
 	register struct tm *ptm = &__time_tm;
 
-	_time_t2tm(timer, 0, ptm); /* Can return NULL... */
+	/* It can return NULL, and then ptm holds a partly written struct;
+	 * handing that out as a result loses the error. */
+	if (_time_t2tm(timer, 0, ptm) == NULL) {
+		return NULL;
+	}
 
 	return ptm;
 }
@@ -578,7 +598,9 @@ struct tm *localtime(const time_t *timer)
 
 	/* In this implementation, tzset() is called by localtime_r().  */
 
-	localtime_r(timer, ptm);	/* Can return NULL... */
+	if (localtime_r(timer, ptm) == NULL) {	/* It can return NULL. */
+		return NULL;
+	}
 
 	return ptm;
 }
@@ -591,15 +613,17 @@ libc_hidden_def(localtime)
 struct tm *localtime_r(register const time_t *__restrict timer,
 					   register struct tm *__restrict result)
 {
+	struct tm *p;
+
 	__UCLIBC_MUTEX_LOCK(_time_tzlock);
 
 	_time_tzset(*timer < new_rule_starts);
 
-	__time_localtime_tzi(timer, result, _time_tzinfo);
+	p = __time_localtime_tzi(timer, result, _time_tzinfo);
 
 	__UCLIBC_MUTEX_UNLOCK(_time_tzlock);
 
-	return result;
+	return p;
 }
 libc_hidden_def(localtime_r)
 
@@ -748,15 +772,30 @@ struct tm attribute_hidden *__time_localtime_tzi(register const time_t *__restri
 
 	dst = 0;
 	do {
+		/* _time_t2tm() is handed the time a week ahead and a -7 day
+		 * correction, so that a 32-bit time_t stays non-negative while
+		 * the zone offset is applied.  Near the top of the range that
+		 * week would overflow, so it is subtracted instead -- but only
+		 * the week changes sign, never the zone offset.  Negating the
+		 * whole sum moved the clock by twice the offset.
+		 *
+		 * The bound follows time_t.  It used to be LONG_MAX, which is
+		 * 2^31-1 on the 32-bit targets that set UCLIBC_USE_TIME64:
+		 * every date past January 2038 took the fallback path there,
+		 * so localtime() was off by 2*gmtoff in every zone but UTC. */
 		days = -7;
 		offset = 604800L - tzi[dst].gmt_offset;
-		if (*timer > (LONG_MAX - 604800L)) {
+		if (*timer > (TIME_T_MAX - 604800L)) {
 			days = -days;
-			offset = -offset;
+			offset = -604800L - tzi[dst].gmt_offset;
 		}
 		*x = *timer + offset;
 
-		_time_t2tm(x, days, result);
+		/* Out of range for a struct tm; tm_isdst below would read a
+		 * result that was never written. */
+		if (_time_t2tm(x, days, result) == NULL) {
+			return NULL;
+		}
 		result->tm_isdst = dst;
 #ifdef __UCLIBC_HAS_TM_EXTENSIONS__
 # ifdef __USE_BSD
@@ -1022,12 +1061,23 @@ static wchar_t* fmt_to_wc_1(const char *src)
 	}
 	return dest;
 }
+/* For a converted value: consumed at OUTPUT, which frees it there. */
 # define fmt_to_wc(dest, src) \
 	dest = alloc[++allocno] = fmt_to_wc_1(src)
+/* For a converted format string: read through p until the level is popped, so
+ * it belongs to the level and not to OUTPUT.  Freeing it at OUTPUT is a
+ * use-after-free -- the loop then reads *p out of the freed block. */
+# define stacked_to_wc(dest, src) \
+	do { \
+		if (fmt_alloc[lvl - 1] != NULL) \
+			free((void *)fmt_alloc[lvl - 1]); \
+		dest = fmt_alloc[lvl - 1] = fmt_to_wc_1(src); \
+	} while (0)
 # define to_wc(dest, src) \
 	dest = fmt_to_wc_1(src)
 #else
 # define fmt_to_wc(dest, src) (dest) = (src)
+# define stacked_to_wc(dest, src) (dest) = (src)
 # define to_wc(dest, src) (dest) = (src)
 #endif
 
@@ -1048,6 +1098,10 @@ size_t __XL_NPP(strftime)(CHAR_T *__restrict s, size_t maxsize,
 #if defined __UCLIBC_HAS_WCHAR__ && (defined L_wcsftime || defined L_wcsftime_l)
 	const CHAR_T *alloc[MAX_PUSH];
 	int allocno = -1;
+	/* A converted format string is read through p for as long as its stack
+	 * level lives, so it cannot be freed at OUTPUT like a converted value.
+	 * One slot per level, freed when the level is popped. */
+	const CHAR_T *fmt_alloc[MAX_PUSH];
 #endif
 	size_t count;
 	size_t o_count;
@@ -1067,6 +1121,14 @@ size_t __XL_NPP(strftime)(CHAR_T *__restrict s, size_t maxsize,
 
 LOOP:
 	if (!count) {
+#if defined __UCLIBC_HAS_WCHAR__ && (defined L_wcsftime || defined L_wcsftime_l)
+		/* Returning from inside an expansion, so the levels are never
+		 * popped and have to be released here. */
+		while (lvl > 0) {
+			if (fmt_alloc[--lvl] != NULL)
+				free((void *)fmt_alloc[lvl]);
+		}
+#endif
 		return 0;
 	}
 	if (!*p) {
@@ -1075,6 +1137,12 @@ LOOP:
 			return maxsize - count;
 		}
 		p = stack[--lvl];
+#if defined __UCLIBC_HAS_WCHAR__ && (defined L_wcsftime || defined L_wcsftime_l)
+		if (fmt_alloc[lvl] != NULL) {
+			free((void *)fmt_alloc[lvl]);
+			fmt_alloc[lvl] = NULL;
+		}
+#endif
 		goto LOOP;
 	}
 
@@ -1120,31 +1188,41 @@ LOOP:
 			if (lvl == MAX_PUSH) {
 				goto OUTPUT;	/* Stack full so treat as illegal spec. */
 			}
-			stack[lvl++] = ++p;
+			stack[lvl] = ++p;
+#if defined __UCLIBC_HAS_WCHAR__ && (defined L_wcsftime || defined L_wcsftime_l)
+			fmt_alloc[lvl] = NULL;
+#endif
+			++lvl;
 			if ((code &= 0xf) < 8) {
 				ccp = (const char *)(spec + STACKED_STRINGS_START + code);
 				ccp += *ccp;
-				fmt_to_wc(p, ccp);
+				stacked_to_wc(p, ccp);
 				goto LOOP;
 			}
 			ccp = (const char *)spec + STACKED_STRINGS_NL_ITEM_START + (code & 7);
-			fmt_to_wc(p, ccp);
+			stacked_to_wc(p, ccp);
 #ifdef ENABLE_ERA_CODE
 			if ((mod & NO_E_MOD) /* Actually, this means E modifier present. */
 				&& (*(ccp = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME,
-							(int)(((unsigned char *)p)[4]))
+							(int)(UCHAR_T)(p[4]))
 							__LOCALE_ARG
 							)))
 				) {
-				fmt_to_wc(p, ccp);
+				stacked_to_wc(p, ccp);
 				goto LOOP;
 			}
 #endif
+			/* The index is the value of the character, not its first
+			 * byte: for wcsftime p is wchar_t*, so reading a byte gives
+			 * the high one on a big-endian target -- always 0, which is
+			 * ABDAY_1, and %c %x %X %r all returned "Sun".  UCHAR_T is
+			 * unsigned char in the narrow build and unsigned int in the
+			 * wide one, which is exactly the widening wanted here. */
 			ccp = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME,
-							(int)(*((unsigned char *)p)))
+							(int)(UCHAR_T)(*p))
 							__LOCALE_ARG
 							);
-			fmt_to_wc(p, ccp);
+			stacked_to_wc(p, ccp);
 			goto LOOP;
 		}
 
@@ -1667,7 +1745,9 @@ LOOP:
 				buf = o;
 
 				if (!code) {	/* s */
-					localtime_r(&t, tm); /* TODO: check for failure? */
+					if (localtime_r(&t, tm) == NULL) {
+						return NULL;
+					}
 					i = 0;
 					do {		/* Now copy values from tm to fields. */
 						 fields[i] = ((int *) tm)[i];
@@ -2248,19 +2328,29 @@ struct tm attribute_hidden *_time_t2tm(const time_t *__restrict timer,
 		vp = _vals;
 		do {
 			if ((v = *vp) == 7) {
-				/* Overflow checking, assuming time_t is long int... */
-#if (LONG_MAX > INT_MAX) && (LONG_MAX > 2147483647L)
-#if (INT_MAX == 2147483647L) && (LONG_MAX == 9223372036854775807L)
-				/* Valid range for t is [-784223472856L, 784223421720L].
-				 * Outside of this range, the tm_year field will overflow. */
-				if (((unsigned long)(t + offset- -784223472856L))
-					> (784223421720L - -784223472856L)
+				/* t counts days here, and tm_year is an int, so the
+				 * broken-down time only exists while t stays inside
+				 * [-784223472856, 784223421720] -- those bounds are
+				 * INT_MAX years either side of the epoch.
+				 *
+				 * This used to ask whether long was wider than int,
+				 * which is false on the 32-bit targets that set
+				 * UCLIBC_USE_TIME64: the check was compiled out on
+				 * exactly the configurations that need it.  Ask about
+				 * time_t instead.  sizeof is a constant, so a 32-bit
+				 * time_t -- whose days can never leave the range --
+				 * still compiles the test away. */
+#if INT_MAX == 2147483647
+				if ((sizeof(time_t) > 4)
+					&& (((uintmax_t)((intmax_t) t + offset
+									 - (intmax_t) -784223472856LL))
+						> (uintmax_t)(784223421720LL - -784223472856LL))
 					) {
+					__set_errno(EOVERFLOW);
 					return NULL;
 				}
 #else
-#error overflow conditions unknown
-#endif
+#error tm_year range unknown for this int width
 #endif
 
 				/* We have days since the epoch, so caluclate the weekday. */
@@ -2474,7 +2564,7 @@ DST_CORRECT:
 		+ tzi[default_dst].gmt_offset
 		+ 60*( p[1]
 			   + 60*(p[2]
-					 + 24*(((146073L * ((long long)(p[6])) + d)
+					 + 24*(((146097L * ((long long)(p[6])) + d)
 							+ p[3]) + p[7])));
 
 DST_CORRECT:
@@ -2496,7 +2586,10 @@ DST_CORRECT:
 	d = ((struct tm *)p)->tm_isdst;
 	t = secs;
 
-	__time_localtime_tzi(&t, (struct tm *)p, tzi);
+	if (__time_localtime_tzi(&t, (struct tm *)p, tzi) == NULL) {
+		t = ((time_t)(-1));
+		goto DONE;
+	}
 
 	if (t == ((time_t)(-1))) {	/* Remember, time_t can be unsigned. */
 		goto DONE;
