@@ -3589,7 +3589,11 @@ typedef Elf32_Addr Elf32_Conflict;
 #define R_XTENSA_TLSDESC_FN	50
 #define R_XTENSA_TLSDESC_ARG	51
 #define R_XTENSA_TLS_TPOFF	53
-#define R_XTENSA_SYM32		63
+/* Upstream binutils uses 63 for the link-time PDIFF_ULEB128 relocation.
+   FDPIC SYM32 now uses the previously unused slot 71.  The dynamic
+   loader also accepts the original FDPIC number for existing objects.  */
+#define R_XTENSA_SYM32_LEGACY	63
+#define R_XTENSA_SYM32		71
 #define R_XTENSA_FUNCDESC	68
 #define R_XTENSA_FUNCDESC_VALUE	69
 #define R_XTENSA_TLSDESC	72

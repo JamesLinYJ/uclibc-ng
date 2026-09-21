@@ -217,6 +217,7 @@ _dl_do_reloc (struct elf_resolve *tpnt, struct r_scope_elem *scope,
 
 	case R_XTENSA_GLOB_DAT:
 	case R_XTENSA_JMP_SLOT:
+	case R_XTENSA_SYM32_LEGACY:
 	case R_XTENSA_SYM32:
 		*reloc_addr = symbol_addr + rpnt->r_addend;
 		break;

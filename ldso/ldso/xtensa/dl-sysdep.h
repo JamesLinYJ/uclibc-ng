@@ -208,6 +208,7 @@ elf_machine_load_address (void)
 
 #define PERFORM_BOOTSTRAP_RELOC(RELP,REL,SYMBOL,LOAD,SYMTAB)	\
 	switch (ELF_R_TYPE((RELP)->r_info)){			\
+	case R_XTENSA_SYM32_LEGACY:				\
 	case R_XTENSA_SYM32:					\
 		*(REL)  = (SYMBOL) + (RELP)->r_addend;		\
 		break;						\
