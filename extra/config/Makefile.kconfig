@@ -201,7 +201,8 @@ $(obj)/dochecklxdialog:
 always := dochecklxdialog
 
 # Add environment specific flags
-HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh $(HOSTCC) $(HOSTCFLAGS))
+HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh \
+	$(HOSTCC) $(KCONFIG_BUILD_CFLAGS) $(HOSTCFLAGS) $(KCONFIG_BUILD_LDFLAGS))
 
 # generated files seem to need this to find local include files
 HOSTCFLAGS_zconf.lex.o	:= -I$(src)

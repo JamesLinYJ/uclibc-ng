@@ -18,6 +18,12 @@ obj := $(top_builddir)$(src)
 generated := $(patsubst %_shipped,%,$(wildcard *_shipped))
 generated := $(addprefix $(obj)/,$(generated:.c=.o))
 
+# Save the caller's flags before the per-target additions below.  The
+# gettext probe must use the same flags without recursively expanding
+# HOST_EXTRACFLAGS through BUILD_CFLAGS.
+KCONFIG_BUILD_CFLAGS := $(BUILD_CFLAGS)
+KCONFIG_BUILD_LDFLAGS := $(BUILD_LDFLAGS)
+
 include $(top_srcdir)extra/config/Makefile.kconfig
 HOST_EXTRACFLAGS += -DCONFIG_='""'
 
@@ -44,7 +50,7 @@ host-cmulti := $(foreach m,$(__hostprogs),\
 host-cobjs  := $(sort $(foreach m,$(__hostprogs),$($(m)-objs)))
 
 conf mconf nconf kxgettext: %: $(obj)/%
-$(obj)/conf $(obj)/mconf $(obj)/nconf $(obj)/kxgettext: BUILD_LDFLAGS=$(HOSTLOADLIBES_$(@F))
+$(obj)/conf $(obj)/mconf $(obj)/nconf $(obj)/kxgettext: override BUILD_LDFLAGS+=$(HOSTLOADLIBES_$(@F))
 $(obj)/conf: $(conf-objs)
 	$(hcompile.u)
 $(obj)/mconf: $(mconf-objs)
@@ -54,7 +60,7 @@ $(obj)/nconf: $(nconf-objs)
 $(obj)/kxgettext: $(kxgettext-objs)
 	$(hcompile.u)
 
-$(host-csingle) $(host-cmulti) $(host-cobjs): BUILD_CFLAGS+=$(HOST_EXTRACFLAGS) \
+$(host-csingle) $(host-cmulti) $(host-cobjs): override BUILD_CFLAGS+=$(HOST_EXTRACFLAGS) \
 					$(HOSTCFLAGS) $(HOSTCFLAGS_$(@F))
 
 host-cobjs.nogen := $(filter-out $(generated),$(host-cobjs))
