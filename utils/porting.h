@@ -33,22 +33,27 @@
 # include <sys/mman.h>
 #endif
 
-#ifdef BUILDING_LINKAGE
+/* Host tools inspect target ELF files without depending on the host dynamic
+ * loader ABI. In particular, do not redefine the host libc's __WORDSIZE. */
+#ifdef ARCH_NATIVE_BIT
+#include <elf.h>
+#define UTILS_ELF_BITS ARCH_NATIVE_BIT
+#define __ELF_NATIVE_CLASS ARCH_NATIVE_BIT
+#define UTILS_ELF_TYPE_(bits, type) Elf##bits##_##type
+#define UTILS_ELF_TYPE(bits, type) UTILS_ELF_TYPE_(bits, type)
+#define ElfW(type) UTILS_ELF_TYPE(__ELF_NATIVE_CLASS, type)
+#else
 #include <link.h>
-/* makefile will include elf.h for us */
-
-#include "bswap.h"
-#include "dl-defs.h"
+#define UTILS_ELF_BITS __ELF_NATIVE_CLASS
 #endif
 
-/* __WORDSIZE ist used for __ELF_NATIVE_CLASS, which is used for ElfW().
-  We want to provide the wordsize of the target, not of the host, when
-   compiling readelf.host
- */
-#include <link.h>
-#ifdef ARCH_NATIVE_BIT
-#undef __WORDSIZE
-#define __WORDSIZE ARCH_NATIVE_BIT
+#if UTILS_ELF_BITS != 32 && UTILS_ELF_BITS != 64
+#error Unsupported ELF word size
+#endif
+
+#ifdef BUILDING_LINKAGE
+#include "bswap.h"
+#include "dl-defs.h"
 #endif
 
 #ifdef DMALLOC

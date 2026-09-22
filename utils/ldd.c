@@ -210,7 +210,7 @@ static __inline__ uint64_t byteswap64_to_host(uint64_t value)
 	}
 }
 
-#if __WORDSIZE == 64
+#if UTILS_ELF_BITS == 64
 # define byteswap_to_host(x) byteswap64_to_host(x)
 #else
 # define byteswap_to_host(x) byteswap32_to_host(x)
@@ -250,7 +250,7 @@ static void *elf_find_dynamic(int64_t const key, ElfW(Dyn) *dynp,
 	for (; DT_NULL != byteswap_to_host(dynp->d_tag); ++dynp) {
 		if (key == byteswap_to_host(dynp->d_tag)) {
 			if (return_val == 1)
-				return (void *)byteswap_to_host(dynp->d_un.d_val);
+				return (void *)(uintptr_t)byteswap_to_host(dynp->d_un.d_val);
 			else
 				return (void *)(byteswap_to_host(dynp->d_un.d_val) - tx_reloc + (char *)ehdr);
 		}
@@ -275,8 +275,8 @@ static char *elf_find_rpath(ElfW(Ehdr) *ehdr, ElfW(Dyn) *dynamic)
 static int check_elf_header(ElfW(Ehdr) *const ehdr)
 {
 	if (!ehdr || *(uint32_t*)ehdr != ELFMAG_U32
-	 /* Use __WORDSIZE, not ELFCLASSM which depends on the host */
-	 || ehdr->e_ident[EI_CLASS] != (__WORDSIZE >> 5)
+	 /* Inspect the target ELF class, not ELFCLASSM of the host CPU. */
+	 || ehdr->e_ident[EI_CLASS] != (UTILS_ELF_BITS >> 5)
 	 || ehdr->e_ident[EI_VERSION] != EV_CURRENT
 	) {
 		return 1;

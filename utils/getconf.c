@@ -436,7 +436,9 @@ static const struct conf vars[] =
 #ifdef _SC_BC_STRING_MAX
     { "BC_STRING_MAX", _SC_BC_STRING_MAX, SYSCONF },
 #endif
+#ifdef _SC_CHARCLASS_NAME_MAX
     { "CHARCLASS_NAME_MAX", _SC_CHARCLASS_NAME_MAX, SYSCONF },
+#endif
 #ifdef _SC_COLL_WEIGHTS_MAX
     { "COLL_WEIGHTS_MAX", _SC_COLL_WEIGHTS_MAX, SYSCONF },
 #endif
@@ -1069,6 +1071,25 @@ usage (void)
 }
 
 
+static int
+unsigned_sysconf_value (int name)
+{
+  switch (name)
+    {
+#if defined _SC_UINT_MAX || defined _SC_ULONG_MAX
+#ifdef _SC_UINT_MAX
+    case _SC_UINT_MAX:
+#endif
+#ifdef _SC_ULONG_MAX
+    case _SC_ULONG_MAX:
+#endif
+      return 1;
+#endif
+    default:
+      return 0;
+    }
+}
+
 static attribute_noreturn void
 print_all (const char *path)
 {
@@ -1089,8 +1110,7 @@ print_all (const char *path)
       case SYSCONF:
 	value = sysconf (c->call_name);
 	if (value == -1l) {
-	  if (c->call_name == _SC_UINT_MAX
-	    || c->call_name == _SC_ULONG_MAX)
+	  if (unsigned_sysconf_value (c->call_name))
 	    printf ("%lu", value);
 	}
 	else {
@@ -1175,7 +1195,8 @@ environment SPEC.\n\n");
   else
     {
       char default_name[getconf_dirlen + sizeof "/default"];
-      memcpy (mempcpy (default_name, getconf_dir, getconf_dirlen),
+      memcpy (default_name, getconf_dir, getconf_dirlen);
+      memcpy (default_name + getconf_dirlen,
 	      "/default", sizeof "/default");
       int len = readlink (default_name, buf, sizeof buf - 1);
       if (len > 0)
@@ -1317,8 +1338,7 @@ environment SPEC.\n\n");
 	    value = sysconf (c->call_name);
 	    if (value == -1l)
 	      {
-		if (c->call_name == _SC_UINT_MAX
-		    || c->call_name == _SC_ULONG_MAX)
+		if (unsigned_sysconf_value (c->call_name))
 		  printf ("%lu\n", value);
 		else
 		  puts (_("undefined"));
